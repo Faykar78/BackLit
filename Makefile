@@ -17,7 +17,7 @@ SOURCES = $(SRC_DIR)/main.c \
 
 OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SOURCES))
 
-all: $(OBJ_DIR) $(TARGET) kb_ctl kb_gui
+all: $(OBJ_DIR) $(TARGET) kb_ctl kb_gui kb_service
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
@@ -38,7 +38,7 @@ kb_gui: $(SRC_DIR)/kb_gui.c
 
 # Background service daemon
 kb_service: $(SRC_DIR)/kb_service.c
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	$(CC) -Wall -O2 -o $@ $<
 
 clean:
 	rm -rf $(OBJ_DIR) $(TARGET) kb_ctl kb_gui kb_service
