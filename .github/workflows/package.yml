@@ -31,8 +31,7 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          *.deb
+        files: "*.deb"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -40,4 +39,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: backlit-deb
-        path: *.deb
+        path: "*.deb"
