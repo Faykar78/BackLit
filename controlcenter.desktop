@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Control Center
+GenericName=System Control
+Comment=Clevo/Tuxedo laptop control center - CC30 style
+Exec=/usr/local/bin/kb_gui
+Icon=preferences-system
+Terminal=false
+Categories=System;Settings;HardwareSettings;
+Keywords=keyboard;led;fan;power;profile;tuxedo;clevo;
+StartupNotify=true

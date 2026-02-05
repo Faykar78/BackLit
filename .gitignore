@@ -1,0 +1,27 @@
+# Build artifacts
+*.o
+obj/
+controlcenter
+kb_ctl
+kb_gui
+kb_service
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Kernel module build artifacts
+*.ko
+*.mod
+*.mod.c
+*.mod.o
+modules.order
+Module.symvers
+.tmp_versions/

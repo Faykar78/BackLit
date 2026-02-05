@@ -1,0 +1,14 @@
+# Clevo keyboard backlight udev rules
+# Allows users in 'input' group to control keyboard backlight without sudo
+
+# Set permissions on clevo_xsm_wmi sysfs files
+SUBSYSTEM=="platform", KERNEL=="clevo_xsm_wmi", \
+    RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_brightness", \
+    RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_color", \
+    RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_state", \
+    RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_wave", \
+    RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_mode", \
+    RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_led_mode"
+
+# Allow everyone to read keyboard input device (fixes permission issues without logout)
+SUBSYSTEM=="input", ATTRS{name}=="TUXEDO Keyboard", MODE="0666"

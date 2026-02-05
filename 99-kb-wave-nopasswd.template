@@ -1,0 +1,6 @@
+# Allow password-less keyboard backlight module reload
+# This enables the wave effect toggle in kb_gui without password prompts
+# INSTALL: Replace YOUR_USERNAME with your actual username, then copy to /etc/sudoers.d/
+
+# YOUR_USERNAME ALL=(ALL) NOPASSWD: /sbin/rmmod clevo-xsm-wmi
+# YOUR_USERNAME ALL=(ALL) NOPASSWD: /sbin/modprobe clevo-xsm-wmi
