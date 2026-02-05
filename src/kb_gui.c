@@ -321,11 +321,11 @@ static void on_brightness_changed(GtkRange *range, gpointer data)
     update_status(buf);
 }
 
+/* Unused after color wheel implementation
 static void on_color_clicked(GtkButton *btn, gpointer data)
 {
     int idx = GPOINTER_TO_INT(data);
     
-    // Update selection visually 
     for (int i = 0; i < NUM_COLORS; i++) {
         if (i == idx) {
             gtk_widget_add_css_class(color_buttons[i], "selected");
@@ -340,7 +340,8 @@ static void on_color_clicked(GtkButton *btn, gpointer data)
     char buf[64];
     snprintf(buf, sizeof(buf), "Color: %s", colors[idx].name);
     update_status(buf);
-} */
+}
+*/
 
 static void on_wave_toggled(GObject *sw, GParamSpec *pspec, gpointer data)
 {
