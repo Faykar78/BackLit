@@ -45,7 +45,7 @@ static void write_sysfs(const char *attr, const char *value)
     
     int fd = open(path, O_WRONLY);
     if (fd >= 0) {
-        write(fd, value, strlen(value));
+        if (write(fd, value, strlen(value))) {};
         close(fd);
     }
 }

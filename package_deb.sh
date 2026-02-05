@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x # Enable debug logging
 
 APP_NAME="backlit"
 VERSION="1.0.0"

@@ -122,10 +122,10 @@ static int kb_get_wave(void)
     return atoi(buf);
 }
 
-static void kb_set_state(int on)
+/* static void kb_set_state(int on)
 {
     write_sysfs("kb_state", on ? "1" : "0");
-}
+} */
 
 static void kb_set_brightness(int level)
 {
@@ -147,7 +147,7 @@ static void kb_set_wave(int on)
 }
 
 /* HSV to RGB conversion (h: 0-360, s,v: 0-1) -> r,g,b: 0-1 */
-static void hsv_to_rgb(double h, double s, double v, double *r, double *g, double *b)
+/* static void hsv_to_rgb(double h, double s, double v, double *r, double *g, double *b)
 {
     int i = (int)(h / 60.0) % 6;
     double f = h / 60.0 - i;
@@ -163,12 +163,11 @@ static void hsv_to_rgb(double h, double s, double v, double *r, double *g, doubl
         case 4: *r = t; *g = p; *b = v; break;
         case 5: *r = v; *g = p; *b = q; break;
     }
-}
+} */
 
 /* Get color name from hue (map to preset colors) */
-static const char* hue_to_color_name(double hue)
+/* static const char* hue_to_color_name(double hue)
 {
-    /* Map hue (0-360) to our preset color names */
     if (hue < 30) return "red";
     if (hue < 60) return "orange";
     if (hue < 90) return "yellow";
@@ -181,7 +180,7 @@ static const char* hue_to_color_name(double hue)
     if (hue < 300) return "magenta";
     if (hue < 330) return "pink";
     return "red";
-}
+} */
 /* Parse hex color to RGB */
 static void hex_to_rgb(const char *hex, double *r, double *g, double *b)
 {
@@ -326,7 +325,7 @@ static void on_color_clicked(GtkButton *btn, gpointer data)
 {
     int idx = GPOINTER_TO_INT(data);
     
-    /* Update selection visually */
+    // Update selection visually 
     for (int i = 0; i < NUM_COLORS; i++) {
         if (i == idx) {
             gtk_widget_add_css_class(color_buttons[i], "selected");
@@ -341,7 +340,7 @@ static void on_color_clicked(GtkButton *btn, gpointer data)
     char buf[64];
     snprintf(buf, sizeof(buf), "Color: %s", colors[idx].name);
     update_status(buf);
-}
+} */
 
 static void on_wave_toggled(GObject *sw, GParamSpec *pspec, gpointer data)
 {
