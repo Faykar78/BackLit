@@ -10,7 +10,7 @@ echo "🔨 Building .deb package..."
 
 # Compile everything
 make clean
-make all
+make kb_gui kb_ctl kb_service
 
 # Create directory structure
 mkdir -p "${PKG_DIR}/DEBIAN"

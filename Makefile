@@ -17,7 +17,7 @@ SOURCES = $(SRC_DIR)/main.c \
 
 OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SOURCES))
 
-all: $(OBJ_DIR) $(TARGET) kb_ctl kb_gui kb_service
+all: kb_gui kb_ctl kb_service
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
