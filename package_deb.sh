@@ -10,8 +10,16 @@ PKG_DIR="build_deb/${APP_NAME}_${VERSION}_${ARCH}"
 echo "🔨 Building .deb package..."
 
 # Compile everything
-make clean
-make kb_gui kb_ctl kb_service
+make clean || true  # Don't fail if nothing to clean
+
+echo "Building kb_gui..."
+make kb_gui || { echo "Failed to build kb_gui"; exit 1; }
+
+echo "Building kb_ctl..."
+make kb_ctl || { echo "Failed to build kb_ctl"; exit 1; }
+
+echo "Building kb_service..."
+make kb_service || { echo "Failed to build kb_service"; exit 1; }
 
 # Create directory structure
 mkdir -p "${PKG_DIR}/DEBIAN"
