@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+# Reload udev rules to apply permission changes
+udevadm control --reload-rules && udevadm trigger
+
+# Update desktop database for the menu entry
+update-desktop-database /usr/share/applications || true
+
+echo "BackLit installed successfully!"
+echo "Please restart your computer or log out and back in for hotkeys to work correctly."
+echo "Secure Boot must be DISABLED for the backlight to work."
