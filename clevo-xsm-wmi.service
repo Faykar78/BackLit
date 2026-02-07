@@ -1,0 +1,19 @@
+[Unit]
+Description=Load clevo_xsm_wmi kernel module for keyboard backlight
+After=systemd-modules-load.service
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Remove conflicting TUXEDO modules (- prefix ignores errors if not loaded)
+ExecStartPre=-/sbin/rmmod tuxedo_io
+ExecStartPre=-/sbin/rmmod tuxedo_keyboard
+ExecStartPre=-/sbin/rmmod clevo_wmi
+ExecStartPre=-/sbin/rmmod clevo_acpi
+# Load our clevo module (- prefix to not fail if already loaded)
+ExecStart=-/sbin/insmod /lib/modules/clevo-xsm-wmi.ko
+ExecStop=-/sbin/rmmod clevo_xsm_wmi
+
+[Install]
+WantedBy=multi-user.target
