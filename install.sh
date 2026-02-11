@@ -23,6 +23,30 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
+# Check build dependencies
+echo "→ Checking build dependencies..."
+MISSING_DEPS=()
+if ! dpkg -s build-essential &>/dev/null; then
+    MISSING_DEPS+=("build-essential")
+fi
+if ! dpkg -s libgtk-4-dev &>/dev/null; then
+    MISSING_DEPS+=("libgtk-4-dev")
+fi
+if ! command -v pkg-config &>/dev/null; then
+    MISSING_DEPS+=("pkg-config")
+fi
+
+if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
+    echo ""
+    echo "  ✗ Missing required packages: ${MISSING_DEPS[*]}"
+    echo ""
+    echo "  Install them with:"
+    echo "    sudo apt install ${MISSING_DEPS[*]}"
+    echo ""
+    exit 1
+fi
+echo "  ✓ All dependencies found"
+
 # Cleanup legacy files to prevent conflicts
 echo "→ Cleaning up legacy files..."
 pkill xbindkeys || true
@@ -32,10 +56,14 @@ sudo rm -f /usr/local/bin/kb_toggle /usr/local/bin/kb_bright_up /usr/local/bin/k
 sudo rm -f "$SCRIPT_DIR/kb_hotkey_daemon.sh" "$SCRIPT_DIR/xbindkeysrc"
 echo "  ✓ Legacy files removed"
 
-# Build if not already built
+# Build applications
 echo "→ Building applications..."
 cd "$SCRIPT_DIR"
-make kb_gui kb_ctl 2>&1 | grep -E "(error|warning|^gcc)" || true
+make kb_gui kb_ctl
+if [ $? -ne 0 ]; then
+    echo "  ✗ Build failed! Check the errors above."
+    exit 1
+fi
 echo "  ✓ Build complete"
 
 # Install binaries
