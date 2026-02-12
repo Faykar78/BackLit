@@ -3,7 +3,7 @@ Version: 1.0.0
 Section: utils
 Priority: optional
 Architecture: amd64
-Depends: libgtk-4-1, libglib2.0-0, libc6
+Depends: libgtk-4-1, libglib2.0-0, libc6, dkms
 Maintainer: Faykar78 <harshamerugu78@email.com>
 Description: A Beautiful Keyboard Backlight Controller for Linux
  BackLit is a modern GTK4 application to control keyboard backlight 
