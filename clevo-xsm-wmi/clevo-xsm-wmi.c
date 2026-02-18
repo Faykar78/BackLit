@@ -984,16 +984,23 @@ static struct kb_backlight_ops kb_8_color_ops = {
 };
 
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+static void clevo_xsm_wmi_notify(union acpi_object *obj, void *context)
+{
+	/* On newer kernels, we don't get the u32 value directly. 
+	 * We assume the event is relevant if we received it.
+	 */
+#else
 static void clevo_xsm_wmi_notify(u32 value, void *context)
 {
-	static unsigned int report_cnt;
-
-	u32 event;
-
 	if (value != 0xD0) {
 		CLEVO_XSM_INFO("Unexpected WMI event (%0#6x)\n", value);
 		return;
 	}
+#endif
+
+	static unsigned int report_cnt;
+	u32 event;
 
 	clevo_xsm_wmi_evaluate_wmbb_method(GET_EVENT, 0, &event);
 	
@@ -1067,11 +1074,18 @@ static int clevo_xsm_wmi_probe(struct platform_device *dev)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 11, 0)
+static void clevo_xsm_wmi_remove(struct platform_device *dev)
+{
+	wmi_remove_notify_handler(CLEVO_EVENT_GUID);
+}
+#else
 static int clevo_xsm_wmi_remove(struct platform_device *dev)
 {
 	wmi_remove_notify_handler(CLEVO_EVENT_GUID);
 	return 0;
 }
+#endif
 
 static int clevo_xsm_wmi_resume(struct platform_device *dev)
 {
@@ -1084,7 +1098,11 @@ static int clevo_xsm_wmi_resume(struct platform_device *dev)
 }
 
 static struct platform_driver clevo_xsm_platform_driver = {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 11, 0)
 	.remove = clevo_xsm_wmi_remove,
+#else
+	.remove = clevo_xsm_wmi_remove,
+#endif
 	.resume = clevo_xsm_wmi_resume,
 	.driver = {
 		.name  = CLEVO_XSM_DRIVER_NAME,
