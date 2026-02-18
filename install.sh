@@ -66,6 +66,36 @@ if [ $? -ne 0 ]; then
 fi
 echo "  ✓ Build complete"
 
+# Build and install kernel module
+echo ""
+echo "→ Building kernel module..."
+KVER=$(uname -r)
+MODULE_DIR="$SCRIPT_DIR/clevo-xsm-wmi"
+if [ -d "$MODULE_DIR" ]; then
+    cd "$MODULE_DIR"
+    make 2>&1 | tail -3
+    if [ -f clevo-xsm-wmi.ko ]; then
+        echo "  ✓ Kernel module built"
+        
+        echo "→ Installing kernel module..."
+        sudo rmmod clevo_xsm_wmi 2>/dev/null || true
+        sudo mkdir -p "/lib/modules/$KVER/extra"
+        sudo cp clevo-xsm-wmi.ko "/lib/modules/$KVER/extra/"
+        sudo depmod -a
+        sudo modprobe clevo_xsm_wmi
+        echo "  ✓ Kernel module installed and loaded"
+        
+        # Auto-load on boot
+        echo "clevo_xsm_wmi" | sudo tee /etc/modules-load.d/clevo-xsm-wmi.conf > /dev/null
+        echo "  ✓ Module set to auto-load on boot"
+    else
+        echo "  ⚠ Kernel module build failed (non-fatal)"
+    fi
+    cd "$SCRIPT_DIR"
+else
+    echo "  ⚠ Kernel module source not found (skipping)"
+fi
+
 # Install binaries
 echo ""
 echo "→ Installing binaries to $INSTALL_PREFIX/bin..."

@@ -122,6 +122,20 @@ static int kb_get_wave(void)
     return atoi(buf);
 }
 
+static int kb_get_wave_interval(void)
+{
+    char buf[16];
+    if (read_sysfs("kb_wave_interval", buf, sizeof(buf)) < 0) return 40;
+    return atoi(buf);
+}
+
+static int kb_get_wave_period(void)
+{
+    char buf[16];
+    if (read_sysfs("kb_wave_period", buf, sizeof(buf)) < 0) return 760;
+    return atoi(buf);
+}
+
 /* static void kb_set_state(int on)
 {
     write_sysfs("kb_state", on ? "1" : "0");
@@ -144,6 +158,20 @@ static void kb_set_color(const char *color)
 static void kb_set_wave(int on)
 {
     write_sysfs("kb_wave", on ? "1" : "0");
+}
+
+static void kb_set_wave_interval(int ms)
+{
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", ms);
+    write_sysfs("kb_wave_interval", buf);
+}
+
+static void kb_set_wave_period(int ms)
+{
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", ms);
+    write_sysfs("kb_wave_period", buf);
 }
 
 /* HSV to RGB conversion (h: 0-360, s,v: 0-1) -> r,g,b: 0-1 */
@@ -287,6 +315,12 @@ static void update_status(const char *msg)
     gtk_label_set_text(GTK_LABEL(status_label), msg);
 }
 
+/* Widgets needed for callbacks */
+static GtkWidget *wave_interval_scale;
+static GtkWidget *wave_period_scale;
+static GtkWidget *wave_interval_label;
+static GtkWidget *wave_period_label;
+
 /* Callbacks */
 static void on_power_toggled(GtkToggleButton *btn, gpointer data)
 {
@@ -348,16 +382,47 @@ static void on_wave_toggled(GObject *sw, GParamSpec *pspec, gpointer data)
     gboolean active = gtk_switch_get_active(GTK_SWITCH(sw));
     
     if (active) {
-        /* Wave requires kernel module reload to start animation */
-        update_status("Reloading module for wave...");
-        system("sudo rmmod clevo-xsm-wmi 2>/dev/null; "
-               "sudo modprobe clevo-xsm-wmi");
         kb_set_wave(1);
         update_status("Wave Enabled");
     } else {
         kb_set_wave(0);
+        /* Restore color after wave stops */
+        kb_set_color(colors[selected_color].name);
+        kb_set_brightness((int)gtk_range_get_value(GTK_RANGE(brightness_scale)));
         update_status("Wave Disabled");
     }
+}
+
+static void on_wave_interval_changed(GtkRange *range, gpointer data)
+{
+    int val = (int)gtk_range_get_value(range);
+    
+    /* Update hardware */
+    kb_set_wave_interval(val);
+    
+    /* Update UI label */
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%d ms", val);
+    gtk_label_set_text(GTK_LABEL(wave_interval_label), buf);
+    
+    snprintf(buf, sizeof(buf), "Wave Interval: %d ms", val);
+    update_status(buf);
+}
+
+static void on_wave_period_changed(GtkRange *range, gpointer data)
+{
+    int val = (int)gtk_range_get_value(range);
+    
+    /* Update hardware */
+    kb_set_wave_period(val);
+    
+    /* Update UI label */
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%d ms", val);
+    gtk_label_set_text(GTK_LABEL(wave_period_label), buf);
+    
+    snprintf(buf, sizeof(buf), "Wave Period: %d ms", val);
+    update_status(buf);
 }
 
 /* Apply CSS styles */
@@ -396,6 +461,20 @@ static void apply_css(void)
         "  font-weight: 600;"
         "  letter-spacing: 0.5px;"
         "  color: rgba(255, 255, 255, 0.85);"
+        "}"
+        
+        /* Sub-labels */
+        ".sub-label {"
+        "  font-size: 11px;"
+        "  color: rgba(255, 255, 255, 0.6);"
+        "  margin-bottom: 2px;"
+        "}"
+        
+        /* Value styling */
+        ".value-label {"
+        "  font-size: 11px;"
+        "  font-weight: bold;"
+        "  color: #00FF88;"
         "}"
         
         /* Power button - premium circular design */
@@ -515,10 +594,14 @@ static void activate(GtkApplication *app, gpointer user_data)
 {
     apply_css();
     
+    /* Disable click-to-jump on slider troughs — only allow dragging */
+    g_object_set(gtk_settings_get_default(),
+                 "gtk-primary-button-warps-slider", FALSE, NULL);
+    
     /* Main window */
     GtkWidget *window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), "Keyboard Backlight");
-    gtk_window_set_default_size(GTK_WINDOW(window), 380, 520);
+    gtk_window_set_default_size(GTK_WINDOW(window), 400, 600);
     
     /* Main box */
     GtkWidget *main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
@@ -581,7 +664,7 @@ static void activate(GtkApplication *app, gpointer user_data)
     g_signal_connect(brightness_scale, "value-changed", G_CALLBACK(on_brightness_changed), NULL);
     gtk_box_append(GTK_BOX(bright_box), brightness_scale);
     
-    char buf[16];
+    char buf[32];
     snprintf(buf, sizeof(buf), "%d", kb_get_brightness());
     gtk_label_set_text(GTK_LABEL(brightness_label), buf);
     
@@ -614,19 +697,64 @@ static void activate(GtkApplication *app, gpointer user_data)
     /* Wave section */
     GtkWidget *wave_frame = gtk_frame_new(NULL);
     gtk_widget_add_css_class(wave_frame, "section-frame");
-    GtkWidget *wave_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *wave_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_frame_set_child(GTK_FRAME(wave_frame), wave_box);
     
+    GtkWidget *wave_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     GtkWidget *wave_label = gtk_label_new("🌊 Wave Effect");
     gtk_widget_add_css_class(wave_label, "section-label");
-    gtk_box_append(GTK_BOX(wave_box), wave_label);
+    gtk_box_append(GTK_BOX(wave_header), wave_label);
     
     wave_switch = gtk_switch_new();
     gtk_switch_set_active(GTK_SWITCH(wave_switch), kb_get_wave());
     gtk_widget_set_hexpand(wave_switch, TRUE);
     gtk_widget_set_halign(wave_switch, GTK_ALIGN_END);
     g_signal_connect(wave_switch, "notify::active", G_CALLBACK(on_wave_toggled), NULL);
-    gtk_box_append(GTK_BOX(wave_box), wave_switch);
+    gtk_box_append(GTK_BOX(wave_header), wave_switch);
+    gtk_box_append(GTK_BOX(wave_box), wave_header);
+    
+    /* Wave Speed Controls */
+    /* Period Slider */
+    GtkWidget *period_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *period_title = gtk_label_new("Period");
+    gtk_widget_add_css_class(period_title, "sub-label");
+    gtk_box_append(GTK_BOX(period_box), period_title);
+    
+    wave_period_label = gtk_label_new("");
+    snprintf(buf, sizeof(buf), "%d ms", kb_get_wave_period());
+    gtk_label_set_text(GTK_LABEL(wave_period_label), buf);
+    gtk_widget_add_css_class(wave_period_label, "value-label");
+    gtk_widget_set_hexpand(wave_period_label, TRUE);
+    gtk_widget_set_halign(wave_period_label, GTK_ALIGN_END);
+    gtk_box_append(GTK_BOX(period_box), wave_period_label);
+    gtk_box_append(GTK_BOX(wave_box), period_box);
+    
+    wave_period_scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 200, 4000, 100);
+    gtk_scale_set_draw_value(GTK_SCALE(wave_period_scale), FALSE);
+    gtk_range_set_value(GTK_RANGE(wave_period_scale), kb_get_wave_period());
+    g_signal_connect(wave_period_scale, "value-changed", G_CALLBACK(on_wave_period_changed), NULL);
+    gtk_box_append(GTK_BOX(wave_box), wave_period_scale);
+    
+    /* Interval Slider */
+    GtkWidget *interval_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *interval_title = gtk_label_new("Interval");
+    gtk_widget_add_css_class(interval_title, "sub-label");
+    gtk_box_append(GTK_BOX(interval_box), interval_title);
+    
+    wave_interval_label = gtk_label_new("");
+    snprintf(buf, sizeof(buf), "%d ms", kb_get_wave_interval());
+    gtk_label_set_text(GTK_LABEL(wave_interval_label), buf);
+    gtk_widget_add_css_class(wave_interval_label, "value-label");
+    gtk_widget_set_hexpand(wave_interval_label, TRUE);
+    gtk_widget_set_halign(wave_interval_label, GTK_ALIGN_END);
+    gtk_box_append(GTK_BOX(interval_box), wave_interval_label);
+    gtk_box_append(GTK_BOX(wave_box), interval_box);
+    
+    wave_interval_scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 10, 200, 5);
+    gtk_scale_set_draw_value(GTK_SCALE(wave_interval_scale), FALSE);
+    gtk_range_set_value(GTK_RANGE(wave_interval_scale), kb_get_wave_interval());
+    g_signal_connect(wave_interval_scale, "value-changed", G_CALLBACK(on_wave_interval_changed), NULL);
+    gtk_box_append(GTK_BOX(wave_box), wave_interval_scale);
     
     gtk_box_append(GTK_BOX(main_box), wave_frame);
     

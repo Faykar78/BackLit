@@ -106,6 +106,20 @@ static int kb_get_wave(void)
     return atoi(buf);
 }
 
+static int kb_get_wave_period(void)
+{
+    char buf[16];
+    if (read_sysfs("kb_wave_period", buf, sizeof(buf)) < 0) return 0;
+    return atoi(buf);
+}
+
+static int kb_get_wave_interval(void)
+{
+    char buf[16];
+    if (read_sysfs("kb_wave_interval", buf, sizeof(buf)) < 0) return 0;
+    return atoi(buf);
+}
+
 /* Set functions */
 static int kb_set_brightness(int level)
 {
@@ -131,6 +145,20 @@ static int kb_set_wave(int on)
     return write_sysfs("kb_wave", on ? "1" : "0");
 }
 
+static int kb_set_wave_period(int ms)
+{
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", ms);
+    return write_sysfs("kb_wave_period", buf);
+}
+
+static int kb_set_wave_interval(int ms)
+{
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", ms);
+    return write_sysfs("kb_wave_interval", buf);
+}
+
 /* Find color by name */
 static int find_color(const char *name)
 {
@@ -148,6 +176,8 @@ static void print_status(void)
     int brightness = kb_get_brightness();
     const char *color = kb_get_color();
     int wave = kb_get_wave();
+    int period = kb_get_wave_period();
+    int interval = kb_get_wave_interval();
     
     printf("╔═══════════════════════════════════════╗\n");
     printf("║     Keyboard Backlight Status         ║\n");
@@ -156,6 +186,9 @@ static void print_status(void)
     printf("║  Brightness: %-24d ║\n", brightness);
     printf("║  Color:      %-24s ║\n", color);
     printf("║  Wave:       %-24s ║\n", wave ? "Enabled" : "Disabled");
+    if (period > 0) {
+        printf("║  Wave Period:%-7d ms (Int: %-3d ms) ║\n", period, interval);
+    }
     printf("╚═══════════════════════════════════════╝\n");
 }
 
@@ -172,6 +205,8 @@ static void print_help(const char *prog)
     printf("  -c, --color COLOR      Set color (blue, red, green, etc.)\n");
     printf("  -w, --wave             Enable wave effect\n");
     printf("  -W, --no-wave          Disable wave effect\n");
+    printf("  -P, --wave-period MS   Set wave animation period in ms (e.g. 3000)\n");
+    printf("  -I, --wave-interval MS Set wave step interval in ms (e.g. 40)\n");
     printf("  -s, --status           Show current status\n");
     printf("  -h, --help             Show this help\n");
     printf("\nColors: ");
@@ -183,21 +218,28 @@ static void print_help(const char *prog)
 int main(int argc, char *argv[])
 {
     static struct option long_options[] = {
-        {"toggle",     no_argument,       0, 't'},
-        {"on",         no_argument,       0, 'o'},
-        {"off",        no_argument,       0, 'O'},
-        {"brightness", required_argument, 0, 'b'},
-        {"color",      required_argument, 0, 'c'},
-        {"wave",       no_argument,       0, 'w'},
-        {"no-wave",    no_argument,       0, 'W'},
-        {"status",     no_argument,       0, 's'},
-        {"help",       no_argument,       0, 'h'},
+        {"toggle",        no_argument,       0, 't'},
+        {"on",            no_argument,       0, 'o'},
+        {"off",           no_argument,       0, 'O'},
+        {"brightness",    required_argument, 0, 'b'},
+        {"color",         required_argument, 0, 'c'},
+        {"wave",          no_argument,       0, 'w'},
+        {"no-wave",       no_argument,       0, 'W'},
+        {"wave-period",   required_argument, 0, 'P'},
+        {"wave-interval", required_argument, 0, 'I'},
+        {"status",        no_argument,       0, 's'},
+        {"help",          no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
     
     if (!kb_is_available()) {
         fprintf(stderr, "Error: Keyboard backlight not available\n");
         fprintf(stderr, "Make sure clevo_xsm_wmi module is loaded\n");
+        /* Attempt to just print help if requested even without module */
+        if (argc > 1 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
+             print_help(argv[0]);
+             return 0;
+        }
         return 1;
     }
     
@@ -208,7 +250,7 @@ int main(int argc, char *argv[])
     }
     
     int opt;
-    while ((opt = getopt_long(argc, argv, "toOb:c:wWsh", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "toOb:c:wWP:I:sh", long_options, NULL)) != -1) {
         switch (opt) {
         case 't': /* Toggle */
             {
@@ -257,6 +299,22 @@ int main(int argc, char *argv[])
         case 'W': /* Wave off */
             kb_set_wave(0);
             printf("Wave: Disabled\n");
+            break;
+            
+        case 'P': /* Wave period */
+            {
+                int ms = atoi(optarg);
+                kb_set_wave_period(ms);
+                printf("Wave Period: %d ms\n", ms);
+            }
+            break;
+
+        case 'I': /* Wave interval */
+            {
+                int ms = atoi(optarg);
+                kb_set_wave_interval(ms);
+                printf("Wave Interval: %d ms\n", ms);
+            }
             break;
             
         case 's': /* Status */
