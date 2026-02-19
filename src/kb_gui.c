@@ -1095,7 +1095,7 @@ static int find_tuxedo_keyboard(char *path, size_t pathlen)
         if (fd < 0) continue;
         
         if (ioctl(fd, EVIOCGNAME(sizeof(name)), name) >= 0) {
-            if (strstr(name, "TUXEDO") != NULL) {
+            if (strstr(name, "TUXEDO") != NULL || strstr(name, "Clevo") != NULL) {
                 close(fd);
                 closedir(dir);
                 snprintf(path, pathlen, "%s", devpath);
@@ -1215,6 +1215,9 @@ static void *input_thread_func(void *arg)
                 break;
             case KEY_KBDILLUMUP:      /* 230 */
                 hotkey_brightness(-1); /* Lower number = brighter */
+                break;
+            case KEY_RFKILL:          /* 247 - sent by Clevo WMI */
+                hotkey_toggle();
                 break;
             }
         }
