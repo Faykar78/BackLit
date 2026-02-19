@@ -60,21 +60,38 @@ static int read_sysfs(const char *attr, char *buf, size_t bufsize)
     return 0;
 }
 
-/* Write to sysfs using sudo tee - same format as:
- * echo VALUE | sudo tee /sys/devices/platform/clevo_xsm_wmi/ATTR
- */
+/* Write to sysfs - tries direct write first, falls back to sudo tee */
 static int write_sysfs(const char *attr, const char *value)
 {
+    char path[256];
+    snprintf(path, sizeof(path), "%s/%s", SYSFS_PATH, attr);
+    
+    /* Try direct write first (works with root or correct udev perms) */
+    int fd = open(path, O_WRONLY);
+    if (fd >= 0) {
+        ssize_t n = write(fd, value, strlen(value));
+        close(fd);
+        if (n > 0) return 0;
+    }
+    
+    /* Fallback to sudo tee if direct write failed */
     char cmd[512];
-    snprintf(cmd, sizeof(cmd), "echo '%s' | sudo tee %s/%s > /dev/null", 
-             value, SYSFS_PATH, attr);
+    snprintf(cmd, sizeof(cmd), "echo '%s' | sudo tee %s > /dev/null 2>&1", 
+             value, path);
     return system(cmd);
 }
 
 /* Check if keyboard control is available */
 static int kb_is_available(void)
 {
-    return access(SYSFS_PATH, F_OK) == 0;
+    if (access(SYSFS_PATH, F_OK) != 0) {
+        fprintf(stderr, "Error: Keyboard backlight driver not loaded.\n");
+        fprintf(stderr, "  Path not found: %s\n", SYSFS_PATH);
+        fprintf(stderr, "  Try: sudo modprobe clevo_xsm_wmi\n");
+        fprintf(stderr, "  Or run: install.sh to build and install the driver\n");
+        return 0;
+    }
+    return 1;
 }
 
 /* Get functions */

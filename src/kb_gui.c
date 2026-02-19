@@ -174,6 +174,65 @@ static void kb_set_wave_period(int ms)
     write_sysfs("kb_wave_period", buf);
 }
 
+/* Wave color sequence management */
+#define MAX_WAVE_COLORS 16
+static unsigned int wave_colors[MAX_WAVE_COLORS];
+static int wave_color_count = 0;
+
+/* Read wave color sequence from sysfs */
+static int kb_get_wave_colors(unsigned int *out, int max_count)
+{
+    char buf[256];
+    if (read_sysfs("kb_wave_colors", buf, sizeof(buf)) < 0) {
+        /* Default colors */
+        out[0] = 0x0000FF; out[1] = 0x00FFFF; out[2] = 0x00FF00;
+        out[3] = 0xFFFF00; out[4] = 0xFF8000; out[5] = 0xFF0000;
+        out[6] = 0xFF0080; out[7] = 0xFF00FF; out[8] = 0x8000FF;
+        out[9] = 0x008080; out[10] = 0xFFFFFF;
+        return 11;
+    }
+    
+    int count = 0;
+    char *token = strtok(buf, " \t\n");
+    while (token && count < max_count) {
+        out[count++] = (unsigned int)strtoul(token, NULL, 16);
+        token = strtok(NULL, " \t\n");
+    }
+    return count > 0 ? count : 0;
+}
+
+/* Write wave color sequence to sysfs */
+static void kb_set_wave_colors_sysfs(unsigned int *cols, int count)
+{
+    char buf[256];
+    int pos = 0;
+    for (int i = 0; i < count && pos < (int)sizeof(buf) - 8; i++) {
+        if (i > 0) pos += snprintf(buf + pos, sizeof(buf) - pos, " ");
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "%06X", cols[i]);
+    }
+    write_sysfs("kb_wave_colors", buf);
+}
+
+/* Color name lookup for wave colors */
+static const char* hex_to_color_name(unsigned int hex)
+{
+    switch (hex & 0xFFFFFF) {
+        case 0x0000FF: return "Blue";
+        case 0x00FFFF: return "Cyan";
+        case 0x00FF00: return "Green";
+        case 0xFFFF00: return "Yellow";
+        case 0xFF8000: return "Orange";
+        case 0xFF0000: return "Red";
+        case 0xFF0080: return "Pink";
+        case 0xFF00FF: return "Magenta";
+        case 0x8000FF: return "Purple";
+        case 0x008080: return "Teal";
+        case 0xFFFFFF: return "White";
+        case 0x88FF00: return "Lime";
+        default: return "Custom";
+    }
+}
+
 /* HSV to RGB conversion (h: 0-360, s,v: 0-1) -> r,g,b: 0-1 */
 /* static void hsv_to_rgb(double h, double s, double v, double *r, double *g, double *b)
 {
@@ -425,7 +484,222 @@ static void on_wave_period_changed(GtkRange *range, gpointer data)
     update_status(buf);
 }
 
-/* Apply CSS styles */
+/* ====== Wave Color Sequence Reorder ====== */
+static GtkWidget *wave_colors_container = NULL;
+
+/* Forward declaration */
+static void rebuild_wave_colors_ui(void);
+
+/* Save current wave_colors to sysfs and rebuild UI */
+static void wave_colors_apply(void)
+{
+    kb_set_wave_colors_sysfs(wave_colors, wave_color_count);
+    rebuild_wave_colors_ui();
+}
+
+/* Callbacks for color sequence buttons */
+static void on_wave_color_move_left(GtkButton *btn, gpointer data)
+{
+    int idx = GPOINTER_TO_INT(data);
+    if (idx <= 0 || idx >= wave_color_count) return;
+    
+    unsigned int tmp = wave_colors[idx];
+    wave_colors[idx] = wave_colors[idx - 1];
+    wave_colors[idx - 1] = tmp;
+    
+    wave_colors_apply();
+    update_status("Color moved left");
+}
+
+static void on_wave_color_move_right(GtkButton *btn, gpointer data)
+{
+    int idx = GPOINTER_TO_INT(data);
+    if (idx < 0 || idx >= wave_color_count - 1) return;
+    
+    unsigned int tmp = wave_colors[idx];
+    wave_colors[idx] = wave_colors[idx + 1];
+    wave_colors[idx + 1] = tmp;
+    
+    wave_colors_apply();
+    update_status("Color moved right");
+}
+
+static void on_wave_color_remove(GtkButton *btn, gpointer data)
+{
+    int idx = GPOINTER_TO_INT(data);
+    if (idx < 0 || idx >= wave_color_count || wave_color_count <= 1) return;
+    
+    for (int i = idx; i < wave_color_count - 1; i++)
+        wave_colors[i] = wave_colors[i + 1];
+    wave_color_count--;
+    
+    wave_colors_apply();
+    update_status("Color removed");
+}
+
+/* Available colors for the Add button */
+static const struct { const char *name; unsigned int hex; } add_color_list[] = {
+    {"Blue",    0x0000FF}, {"Cyan",    0x00FFFF}, {"Green",   0x00FF00},
+    {"Lime",    0x88FF00}, {"Yellow",  0xFFFF00}, {"Orange",  0xFF8000},
+    {"Red",     0xFF0000}, {"Pink",    0xFF0080}, {"Magenta", 0xFF00FF},
+    {"Purple",  0x8000FF}, {"Teal",    0x008080}, {"White",   0xFFFFFF},
+};
+#define NUM_ADD_COLORS 12
+
+static void on_wave_color_add(GtkButton *btn, gpointer data)
+{
+    int color_idx = GPOINTER_TO_INT(data);
+    if (wave_color_count >= MAX_WAVE_COLORS || color_idx < 0 || color_idx >= NUM_ADD_COLORS) return;
+    
+    wave_colors[wave_color_count++] = add_color_list[color_idx].hex;
+    
+    wave_colors_apply();
+    
+    char buf[64];
+    snprintf(buf, sizeof(buf), "Added %s", add_color_list[color_idx].name);
+    update_status(buf);
+}
+
+/* Popover for adding colors */
+static void on_add_color_clicked(GtkButton *btn, gpointer data)
+{
+    GtkWidget *popover = gtk_popover_new();
+    gtk_widget_set_parent(popover, GTK_WIDGET(btn));
+    
+    GtkWidget *grid = gtk_grid_new();
+    gtk_grid_set_column_spacing(GTK_GRID(grid), 4);
+    gtk_grid_set_row_spacing(GTK_GRID(grid), 4);
+    gtk_widget_set_margin_start(grid, 8);
+    gtk_widget_set_margin_end(grid, 8);
+    gtk_widget_set_margin_top(grid, 8);
+    gtk_widget_set_margin_bottom(grid, 8);
+    
+    for (int i = 0; i < NUM_ADD_COLORS; i++) {
+        GtkWidget *cbtn = gtk_button_new_with_label(add_color_list[i].name);
+        
+        /* Set button background color */
+        char css_name[32];
+        snprintf(css_name, sizeof(css_name), "add-color-%d", i);
+        gtk_widget_set_name(cbtn, css_name);
+        
+        GtkCssProvider *p = gtk_css_provider_new();
+        char css[256];
+        unsigned int c = add_color_list[i].hex;
+        int r = (c >> 16) & 0xFF, g = (c >> 8) & 0xFF, b = c & 0xFF;
+        int dark = (r + g + b) < 384;
+        snprintf(css, sizeof(css), "#%s { background: #%06X; color: %s; border-radius: 6px; "
+                 "min-width: 60px; min-height: 28px; font-size: 10px; font-weight: 600; }",
+                 css_name, c, dark ? "white" : "black");
+        gtk_css_provider_load_from_data(p, css, -1);
+        gtk_style_context_add_provider_for_display(gdk_display_get_default(),
+            GTK_STYLE_PROVIDER(p), GTK_STYLE_PROVIDER_PRIORITY_USER);
+        
+        g_signal_connect(cbtn, "clicked", G_CALLBACK(on_wave_color_add), GINT_TO_POINTER(i));
+        gtk_grid_attach(GTK_GRID(grid), cbtn, i % 4, i / 4, 1, 1);
+    }
+    
+    gtk_popover_set_child(GTK_POPOVER(popover), grid);
+    gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+/* Rebuild the wave color sequence UI */
+static void rebuild_wave_colors_ui(void)
+{
+    if (!wave_colors_container) return;
+    
+    /* Remove all existing children */
+    GtkWidget *child = gtk_widget_get_first_child(wave_colors_container);
+    while (child) {
+        GtkWidget *next = gtk_widget_get_next_sibling(child);
+        gtk_box_remove(GTK_BOX(wave_colors_container), child);
+        child = next;
+    }
+    
+    /* Title row */
+    GtkWidget *title_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    GtkWidget *title = gtk_label_new("Color Sequence");
+    gtk_widget_add_css_class(title, "sub-label");
+    gtk_box_append(GTK_BOX(title_row), title);
+    
+    /* Add button */
+    if (wave_color_count < MAX_WAVE_COLORS) {
+        GtkWidget *add_btn = gtk_button_new_with_label("+");
+        gtk_widget_add_css_class(add_btn, "wave-add-btn");
+        gtk_widget_set_hexpand(add_btn, TRUE);
+        gtk_widget_set_halign(add_btn, GTK_ALIGN_END);
+        g_signal_connect(add_btn, "clicked", G_CALLBACK(on_add_color_clicked), NULL);
+        gtk_box_append(GTK_BOX(title_row), add_btn);
+    }
+    gtk_box_append(GTK_BOX(wave_colors_container), title_row);
+    
+    /* Scrollable color row */
+    GtkWidget *scroll = gtk_scrolled_window_new();
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
+        GTK_POLICY_AUTOMATIC, GTK_POLICY_NEVER);
+    gtk_widget_set_size_request(scroll, -1, 50);
+    
+    GtkWidget *color_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+    
+    for (int i = 0; i < wave_color_count; i++) {
+        GtkWidget *chip = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+        
+        /* Color swatch button */
+        char label_text[16];
+        snprintf(label_text, sizeof(label_text), "%d", i + 1);
+        GtkWidget *swatch = gtk_button_new_with_label(label_text);
+        
+        /* Style the swatch with the color */
+        char css_name[32];
+        snprintf(css_name, sizeof(css_name), "wc-%d", i);
+        gtk_widget_set_name(swatch, css_name);
+        
+        GtkCssProvider *p = gtk_css_provider_new();
+        char css[256];
+        unsigned int c = wave_colors[i];
+        int r = (c >> 16) & 0xFF, g = (c >> 8) & 0xFF, b = c & 0xFF;
+        int dark = (r + g + b) < 384;
+        snprintf(css, sizeof(css), "#%s { background: #%06X; color: %s; border-radius: 6px; "
+                 "min-width: 32px; min-height: 28px; font-size: 9px; font-weight: 700; border: none; }",
+                 css_name, c, dark ? "white" : "#333");
+        gtk_css_provider_load_from_data(p, css, -1);
+        gtk_style_context_add_provider_for_display(gdk_display_get_default(),
+            GTK_STYLE_PROVIDER(p), GTK_STYLE_PROVIDER_PRIORITY_USER);
+        gtk_widget_set_tooltip_text(swatch, hex_to_color_name(c));
+        gtk_box_append(GTK_BOX(chip), swatch);
+        
+        /* Control buttons row */
+        GtkWidget *ctrl = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+        gtk_widget_set_halign(ctrl, GTK_ALIGN_CENTER);
+        
+        if (i > 0) {
+            GtkWidget *left = gtk_button_new_with_label("◀");
+            gtk_widget_add_css_class(left, "wave-ctrl-btn");
+            g_signal_connect(left, "clicked", G_CALLBACK(on_wave_color_move_left), GINT_TO_POINTER(i));
+            gtk_box_append(GTK_BOX(ctrl), left);
+        }
+        
+        if (wave_color_count > 1) {
+            GtkWidget *rm = gtk_button_new_with_label("✕");
+            gtk_widget_add_css_class(rm, "wave-ctrl-btn");
+            g_signal_connect(rm, "clicked", G_CALLBACK(on_wave_color_remove), GINT_TO_POINTER(i));
+            gtk_box_append(GTK_BOX(ctrl), rm);
+        }
+        
+        if (i < wave_color_count - 1) {
+            GtkWidget *right = gtk_button_new_with_label("▶");
+            gtk_widget_add_css_class(right, "wave-ctrl-btn");
+            g_signal_connect(right, "clicked", G_CALLBACK(on_wave_color_move_right), GINT_TO_POINTER(i));
+            gtk_box_append(GTK_BOX(ctrl), right);
+        }
+        
+        gtk_box_append(GTK_BOX(chip), ctrl);
+        gtk_box_append(GTK_BOX(color_row), chip);
+    }
+    
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), color_row);
+    gtk_box_append(GTK_BOX(wave_colors_container), scroll);
+}
+
 static void apply_css(void)
 {
     GtkCssProvider *provider = gtk_css_provider_new();
@@ -578,6 +852,38 @@ static void apply_css(void)
         "  font-weight: 500;"
         "  color: rgba(255, 255, 255, 0.4);"
         "  letter-spacing: 0.5px;"
+        "}"
+        
+        /* Wave control buttons (move / remove) */
+        ".wave-ctrl-btn {"
+        "  min-width: 18px;"
+        "  min-height: 18px;"
+        "  padding: 0;"
+        "  margin: 0 1px;"
+        "  font-size: 8px;"
+        "  border-radius: 4px;"
+        "  background: rgba(255,255,255,0.08);"
+        "  color: rgba(255,255,255,0.7);"
+        "  border: none;"
+        "}"
+        ".wave-ctrl-btn:hover {"
+        "  background: rgba(255,255,255,0.2);"
+        "  color: white;"
+        "}"
+        
+        /* Wave add button */
+        ".wave-add-btn {"
+        "  min-width: 28px;"
+        "  min-height: 24px;"
+        "  font-size: 14px;"
+        "  font-weight: 700;"
+        "  border-radius: 6px;"
+        "  background: rgba(0, 212, 255, 0.15);"
+        "  color: #00D4FF;"
+        "  border: 1px solid rgba(0, 212, 255, 0.3);"
+        "}"
+        ".wave-add-btn:hover {"
+        "  background: rgba(0, 212, 255, 0.3);"
         "}"
         ;
     
@@ -755,6 +1061,12 @@ static void activate(GtkApplication *app, gpointer user_data)
     gtk_range_set_value(GTK_RANGE(wave_interval_scale), kb_get_wave_interval());
     g_signal_connect(wave_interval_scale, "value-changed", G_CALLBACK(on_wave_interval_changed), NULL);
     gtk_box_append(GTK_BOX(wave_box), wave_interval_scale);
+    
+    /* Wave Color Sequence */
+    wave_colors_container = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+    wave_color_count = kb_get_wave_colors(wave_colors, MAX_WAVE_COLORS);
+    rebuild_wave_colors_ui();
+    gtk_box_append(GTK_BOX(wave_box), wave_colors_container);
     
     gtk_box_append(GTK_BOX(main_box), wave_frame);
     

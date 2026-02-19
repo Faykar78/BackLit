@@ -303,8 +303,9 @@ static unsigned int wave_last_brightness = 99;
 /* Forward declaration */
 static int clevo_xsm_wmi_evaluate_wmbb_method(u32 method_id, u32 arg, u32 *retval);
 
-/* Color values for wave effect */
-static const u32 wave_color_values[] = {
+/* Color values for wave effect (mutable, max 16) */
+#define WAVE_MAX_COLORS 16
+static u32 wave_color_values[WAVE_MAX_COLORS] = {
 	0x0000FF, /* blue */
 	0x00FFFF, /* cyan */
 	0x00FF00, /* green */
@@ -317,7 +318,7 @@ static const u32 wave_color_values[] = {
 	0x008080, /* teal */
 	0xFFFFFF, /* white */
 };
-#define WAVE_NUM_COLORS 11
+static unsigned int wave_num_colors = 11;
 
 /* Sine table for brightness 0-9 (0=bright, 9=dim) */
 static const u8 sine_table[] = {9, 8, 7, 5, 3, 1, 0, 1, 3, 5, 7, 8, 9};
@@ -332,7 +333,7 @@ static void wave_set_brightness_direct(unsigned int level)
 
 static void wave_set_color_direct(unsigned int idx)
 {
-	u32 color = wave_color_values[idx % WAVE_NUM_COLORS];
+	u32 color = wave_color_values[idx % wave_num_colors];
 	/* Color format: B << 16 | R << 8 | G << 0 */
 	u8 r = (color >> 16) & 0xFF;
 	u8 g = (color >> 8) & 0xFF;
@@ -359,7 +360,7 @@ static void wave_work_handler(struct work_struct *work)
 	
 	/* Change color at step 9 (brightness 9 = dimmest) */
 	if (wave_step == 9) {
-		wave_color_idx = (wave_color_idx + 1) % WAVE_NUM_COLORS;
+		wave_color_idx = (wave_color_idx + 1) % wave_num_colors;
 		wave_set_color_direct(wave_color_idx);
 	}
 	
@@ -1416,6 +1417,77 @@ static ssize_t clevo_xsm_wave_interval_store(struct device *dev,
 static DEVICE_ATTR(kb_wave_interval, 0644,
 	clevo_xsm_wave_interval_show, clevo_xsm_wave_interval_store);
 
+static ssize_t clevo_xsm_wave_colors_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	ssize_t len = 0;
+	unsigned int i;
+	
+	for (i = 0; i < wave_num_colors; i++) {
+		if (i > 0)
+			len += sprintf(buf + len, " ");
+		len += sprintf(buf + len, "%06X", wave_color_values[i]);
+	}
+	len += sprintf(buf + len, "\n");
+	return len;
+}
+
+static ssize_t clevo_xsm_wave_colors_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t size)
+{
+	u32 new_colors[WAVE_MAX_COLORS];
+	unsigned int count = 0;
+	const char *p = buf;
+	
+	while (*p && count < WAVE_MAX_COLORS) {
+		const char *start;
+		char token[16];
+		int len;
+		unsigned int val;
+		
+		/* Skip whitespace */
+		while (*p == ' ' || *p == '\t' || *p == '\n')
+			p++;
+		
+		if (*p == '\0')
+			break;
+		
+		/* Find end of token */
+		start = p;
+		while (*p && *p != ' ' && *p != '\t' && *p != '\n')
+			p++;
+		
+		len = p - start;
+		if (len <= 0 || len >= (int)sizeof(token))
+			continue;
+		
+		/* Copy token to null-terminated buffer */
+		memcpy(token, start, len);
+		token[len] = '\0';
+		
+		/* Parse hex value */
+		if (kstrtouint(token, 16, &val))
+			continue;
+		
+		new_colors[count++] = val & 0xFFFFFF;
+	}
+	
+	if (count == 0)
+		return -EINVAL;
+	
+	/* Apply atomically */
+	memcpy(wave_color_values, new_colors, count * sizeof(u32));
+	wave_num_colors = count;
+	
+	/* Reset color index if it's out of bounds */
+	if (wave_color_idx >= wave_num_colors)
+		wave_color_idx = 0;
+	
+	return size;
+}
+static DEVICE_ATTR(kb_wave_colors, 0644,
+	clevo_xsm_wave_colors_show, clevo_xsm_wave_colors_store);
+
 /* LED Mode definitions - matching CC30 */
 #define LED_MODE_STATIC  0
 #define LED_MODE_WAVE    1
@@ -2119,6 +2191,10 @@ static int __init clevo_xsm_init(void)
 		&dev_attr_kb_wave_interval) != 0)
 		CLEVO_XSM_ERROR("Sysfs attribute creation failed for wave interval\n");
 
+	if (device_create_file(&clevo_xsm_platform_device->dev,
+		&dev_attr_kb_wave_colors) != 0)
+		CLEVO_XSM_ERROR("Sysfs attribute creation failed for wave colors\n");
+
 	/* Initialize breath and blink effects */
 	INIT_DELAYED_WORK(&breath_work, breath_work_handler);
 	INIT_DELAYED_WORK(&blink_work, blink_work_handler);
@@ -2158,6 +2234,7 @@ static void __exit clevo_xsm_exit(void)
 	device_remove_file(&clevo_xsm_platform_device->dev, &dev_attr_kb_wave);
 	device_remove_file(&clevo_xsm_platform_device->dev, &dev_attr_kb_wave_period);
 	device_remove_file(&clevo_xsm_platform_device->dev, &dev_attr_kb_wave_interval);
+	device_remove_file(&clevo_xsm_platform_device->dev, &dev_attr_kb_wave_colors);
 	device_remove_file(&clevo_xsm_platform_device->dev, &dev_attr_kb_led_mode);
 	device_remove_file(&clevo_xsm_platform_device->dev, &dev_attr_fan_control);
 	device_remove_file(&clevo_xsm_platform_device->dev, &dev_attr_power_profile);

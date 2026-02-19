@@ -10,7 +10,8 @@ SUBSYSTEM=="platform", KERNEL=="clevo_xsm_wmi", \
     RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_mode", \
     RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_led_mode", \
     RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_wave_interval", \
-    RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_wave_period"
+    RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_wave_period", \
+    RUN+="/bin/chmod 0666 /sys/devices/platform/clevo_xsm_wmi/kb_wave_colors"
 
 # Allow everyone to read keyboard input device (fixes permission issues without logout)
 SUBSYSTEM=="input", ATTRS{name}=="TUXEDO Keyboard", MODE="0666"
