@@ -20,8 +20,8 @@
 |---------|-------------|
 | 🎡 **Color Wheel** | Beautiful circular color picker with 12 preset colors |
 | 🔆 **Brightness Control** | Smooth 10-level brightness adjustment |
-| 🌊 **Wave Effect** | Eye-catching animated wave pattern |
-| ⌨️ **Hotkey Support** | Fn keys work even without the app running |
+| 🌊 **Wave Effect** | Eye-catching animated wave with customizable color sequence |
+| ⌨️ **Hotkey Support** | Ctrl+Numpad hotkeys work system-wide via xbindkeys |
 | 🎨 **Modern UI** | Glassmorphism design with sleek animations |
 
 ## 📦 What's Inside
@@ -89,11 +89,20 @@ kb_ctl --wave                # Toggle wave effect
 ```
 
 ### Hotkeys (Work Without App!)
+
+Hotkeys use `xbindkeys` and work system-wide — no GUI needed.
+
 | Key Combo | Action |
 |-----------|--------|
-| `Fn + Backlight Toggle` | Turn backlight ON/OFF |
-| `Fn + Brightness Up` | Increase brightness |
-| `Fn + Brightness Down` | Decrease brightness |
+| `Ctrl + Numpad *` | Toggle backlight ON/OFF |
+| `Ctrl + Numpad +` | Increase brightness |
+| `Ctrl + Numpad -` | Decrease brightness |
+| `Ctrl + Numpad /` | Cycle color |
+
+To install hotkeys:
+```bash
+./install_hotkeys.sh
+```
 
 ## 🎨 Supported Colors
 
