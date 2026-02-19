@@ -509,6 +509,9 @@ static int __init clevo_xsm_input_init(void)
 
 	set_bit(EV_KEY, clevo_xsm_input_device->evbit);
 	set_bit(KEY_RFKILL, clevo_xsm_input_device->keybit);
+	set_bit(KEY_KBDILLUMTOGGLE, clevo_xsm_input_device->keybit);
+	set_bit(KEY_KBDILLUMUP, clevo_xsm_input_device->keybit);
+	set_bit(KEY_KBDILLUMDOWN, clevo_xsm_input_device->keybit);
 
 	ec_read(0xDB, &byte);
 	ec_write(0xDB, byte & ~0x40);
@@ -1039,9 +1042,11 @@ static void clevo_xsm_wmi_notify(u32 value, void *context)
 		switch (event) {
 		case 0x81:
 			kb_dec_brightness();
+			clevo_xsm_input_report_key(KEY_KBDILLUMDOWN);
 			break;
 		case 0x82:
 			kb_inc_brightness();
+			clevo_xsm_input_report_key(KEY_KBDILLUMUP);
 			break;
 		case 0x83:
 			if (!param_kb_cycle_colors)
@@ -1051,6 +1056,7 @@ static void clevo_xsm_wmi_notify(u32 value, void *context)
 			break;
 		case 0x9F:
 			kb_toggle_state();
+			clevo_xsm_input_report_key(KEY_KBDILLUMTOGGLE);
 			break;
 		}
 		break;

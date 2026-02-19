@@ -1,0 +1,20 @@
+#!/bin/bash
+# Cycle keyboard backlight color
+
+SYSFS="/sys/devices/platform/clevo_xsm_wmi"
+if [ ! -d "$SYSFS" ]; then exit 1; fi
+
+COLORS=(cyan green yellow orange red pink magenta purple teal white blue)
+CURRENT=$(cat "$SYSFS/kb_color" 2>/dev/null | awk '{print $1}')
+
+# Find current index and advance
+NEXT="cyan"
+for i in "${!COLORS[@]}"; do
+    if [ "${COLORS[$i]}" = "$CURRENT" ]; then
+        NEXT="${COLORS[$(( (i + 1) % ${#COLORS[@]} ))]}"
+        break
+    fi
+done
+
+echo "$NEXT $NEXT $NEXT" > "$SYSFS/kb_color" 2>/dev/null || \
+    echo "$NEXT $NEXT $NEXT" | sudo tee "$SYSFS/kb_color" > /dev/null

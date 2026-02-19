@@ -17,6 +17,8 @@
 #include <dirent.h>
 #include <signal.h>
 #include <math.h>
+#include <sys/ioctl.h>
+#include <poll.h>
 
 #define SYSFS_PATH "/sys/devices/platform/clevo_xsm_wmi"
 
@@ -1108,6 +1110,36 @@ static int find_tuxedo_keyboard(char *path, size_t pathlen)
     return -1;
 }
 
+/* Find the AT keyboard input device */
+static int find_at_keyboard(char *path, size_t pathlen)
+{
+    DIR *dir = opendir("/dev/input");
+    if (!dir) return -1;
+    
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strncmp(entry->d_name, "event", 5) != 0) continue;
+        
+        char devpath[256], name[256];
+        snprintf(devpath, sizeof(devpath), "/dev/input/%s", entry->d_name);
+        
+        int fd = open(devpath, O_RDONLY);
+        if (fd < 0) continue;
+        
+        if (ioctl(fd, EVIOCGNAME(sizeof(name)), name) >= 0) {
+            if (strstr(name, "AT Translated Set 2 keyboard") != NULL) {
+                close(fd);
+                closedir(dir);
+                snprintf(path, pathlen, "%s", devpath);
+                return 0;
+            }
+        }
+        close(fd);
+    }
+    closedir(dir);
+    return -1;
+}
+
 /* GUI update for toggle - Safe wrapper for main thread */
 static gboolean update_power_btn_wrapper(gpointer data)
 {
@@ -1181,13 +1213,14 @@ static void hotkey_brightness(int delta)
     g_idle_add(update_brightness_wrapper, GINT_TO_POINTER(level));
 }
 
-/* Input monitoring thread */
+/* Input monitoring thread - monitors Clevo device for KBDILLUM events */
+/* System-wide numpad hotkeys are handled by xbindkeys + shell scripts */
 static void *input_thread_func(void *arg)
 {
     char devpath[256];
     
     if (find_tuxedo_keyboard(devpath, sizeof(devpath)) < 0) {
-        fprintf(stderr, "TUXEDO Keyboard input device not found\n");
+        fprintf(stderr, "Clevo input device not found (hotkeys via xbindkeys only)\n");
         return NULL;
     }
     
@@ -1197,27 +1230,24 @@ static void *input_thread_func(void *arg)
         return NULL;
     }
     
-    printf("Hotkey monitoring started on %s\n", devpath);
+    printf("Hotkey monitoring: Clevo device on %s\n", devpath);
     
     struct input_event ev;
     while (input_running) {
         ssize_t n = read(fd, &ev, sizeof(ev));
         if (n != sizeof(ev)) continue;
         
-        /* Only process key press events (value=1) */
         if (ev.type == EV_KEY && ev.value == 1) {
             switch (ev.code) {
-            case KEY_KBDILLUMTOGGLE:  /* 228 */
+            case KEY_KBDILLUMTOGGLE:
+            case KEY_RFKILL:
                 hotkey_toggle();
                 break;
-            case KEY_KBDILLUMDOWN:    /* 229 */
-                hotkey_brightness(1);  /* Higher number = dimmer */
+            case KEY_KBDILLUMDOWN:
+                hotkey_brightness(1);
                 break;
-            case KEY_KBDILLUMUP:      /* 230 */
-                hotkey_brightness(-1); /* Lower number = brighter */
-                break;
-            case KEY_RFKILL:          /* 247 - sent by Clevo WMI */
-                hotkey_toggle();
+            case KEY_KBDILLUMUP:
+                hotkey_brightness(-1);
                 break;
             }
         }

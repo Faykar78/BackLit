@@ -1,0 +1,12 @@
+#!/bin/bash
+# Decrease keyboard brightness by 1 level
+
+SYSFS="/sys/devices/platform/clevo_xsm_wmi"
+if [ ! -d "$SYSFS" ]; then exit 1; fi
+
+CURRENT=$(cat "$SYSFS/kb_brightness" 2>/dev/null)
+NEW=$((CURRENT + 1))
+if [ $NEW -gt 9 ]; then NEW=9; fi
+
+echo "$NEW" > "$SYSFS/kb_brightness" 2>/dev/null || \
+    echo "$NEW" | sudo tee "$SYSFS/kb_brightness" > /dev/null

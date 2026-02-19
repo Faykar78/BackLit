@@ -1,0 +1,20 @@
+#!/bin/bash
+# Toggle keyboard backlight ON/OFF
+
+SYSFS="/sys/devices/platform/clevo_xsm_wmi"
+
+if [ ! -d "$SYSFS" ]; then
+    exit 1
+fi
+
+CURRENT_COLOR=$(cat "$SYSFS/kb_color" 2>/dev/null | awk '{print $1}')
+
+if [ "$CURRENT_COLOR" = "black" ]; then
+    echo "cyan cyan cyan" > "$SYSFS/kb_color" 2>/dev/null || \
+        echo "cyan cyan cyan" | sudo tee "$SYSFS/kb_color" > /dev/null
+    echo "0" > "$SYSFS/kb_brightness" 2>/dev/null || \
+        echo "0" | sudo tee "$SYSFS/kb_brightness" > /dev/null
+else
+    echo "black black black" > "$SYSFS/kb_color" 2>/dev/null || \
+        echo "black black black" | sudo tee "$SYSFS/kb_color" > /dev/null
+fi
