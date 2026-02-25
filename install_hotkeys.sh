@@ -1,21 +1,21 @@
 #!/bin/bash
 # Install keyboard backlight hotkey scripts and configuration
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 echo "Installing keyboard backlight hotkey scripts..."
 
-# Install scripts to /usr/local/bin
-sudo cp "$SCRIPT_DIR/kb_toggle" /usr/local/bin/
-sudo cp "$SCRIPT_DIR/kb_bright_up" /usr/local/bin/
-sudo cp "$SCRIPT_DIR/kb_bright_down" /usr/local/bin/
-sudo chmod +x /usr/local/bin/kb_toggle /usr/local/bin/kb_bright_up /usr/local/bin/kb_bright_down
+# Scripts are already installed in /usr/local/bin by the deb package,
+# just need to check if they are executable
+sudo chmod +x /usr/local/bin/kb_toggle /usr/local/bin/kb_bright_up /usr/local/bin/kb_bright_down /usr/local/bin/kb_color_cycle 2>/dev/null || true
 
-echo "✓ Scripts installed to /usr/local/bin"
+echo "✓ Scripts are available in /usr/local/bin"
 
 # Install xbindkeys config
-cp "$SCRIPT_DIR/xbindkeysrc" ~/.xbindkeysrc
-echo "✓ xbindkeys config installed to ~/.xbindkeysrc"
+if [ -f "/usr/share/backlit/xbindkeysrc" ]; then
+    cp "/usr/share/backlit/xbindkeysrc" ~/.xbindkeysrc
+    echo "✓ xbindkeys config installed to ~/.xbindkeysrc"
+else
+    echo "⚠ Could not find /usr/share/backlit/xbindkeysrc"
+fi
 
 # Kill existing xbindkeys and restart
 pkill xbindkeys 2>/dev/null

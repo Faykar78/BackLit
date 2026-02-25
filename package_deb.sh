@@ -60,6 +60,19 @@ cp kb_gui "${PKG_DIR}/usr/local/bin/"
 cp kb_ctl "${PKG_DIR}/usr/local/bin/"
 cp kb_service "${PKG_DIR}/usr/local/bin/"
 
+# Copy hotkey scripts
+cp kb_toggle "${PKG_DIR}/usr/local/bin/"
+cp kb_bright_up "${PKG_DIR}/usr/local/bin/"
+cp kb_bright_down "${PKG_DIR}/usr/local/bin/"
+cp kb_color_cycle "${PKG_DIR}/usr/local/bin/"
+cp install_hotkeys.sh "${PKG_DIR}/usr/local/bin/backlit-install-hotkeys"
+
+# Set executable permissions
+chmod +x "${PKG_DIR}/usr/local/bin"/*
+
+# Copy xbindkeysrc config template
+cp xbindkeysrc "${PKG_DIR}/usr/share/backlit/"
+
 # Copy system files
 cp controlcenter.desktop "${PKG_DIR}/usr/share/applications/"
 cp 99-keyboard-backlight.rules "${PKG_DIR}/etc/udev/rules.d/"
