@@ -1,16 +1,16 @@
-# Keyboard backlight hotkeys (Fn key not detectable, using Ctrl as modifier)
-# Ctrl + KP_Multiply (*) = Toggle backlight on/off
+# Keyboard backlight hotkeys (Fn key not detectable)
+# KP_Multiply (*) = Toggle backlight on/off
 "kb_toggle"
-    control + KP_Multiply
+    KP_Multiply
 
-# Ctrl + KP_Add (+) = Brightness up (brighter)
+# KP_Add (+) = Brightness up (brighter)
 "kb_bright_up"
-    control + KP_Add
+    KP_Add
 
-# Ctrl + KP_Subtract (-) = Brightness down (dimmer)
+# KP_Subtract (-) = Brightness down (dimmer)
 "kb_bright_down"
-    control + KP_Subtract
+    KP_Subtract
 
-# Ctrl + KP_Divide (/) = Cycle color
+# KP_Divide (/) = Cycle color
 "kb_color_cycle"
-    control + KP_Divide
+    KP_Divide
