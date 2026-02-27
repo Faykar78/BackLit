@@ -94,10 +94,10 @@ Hotkeys use `xbindkeys` and work system-wide — no GUI needed.
 
 | Key Combo | Action |
 |-----------|--------|
-| `Ctrl + Numpad *` | Toggle backlight ON/OFF |
-| `Ctrl + Numpad +` | Increase brightness |
-| `Ctrl + Numpad -` | Decrease brightness |
-| `Ctrl + Numpad /` | Cycle color |
+| `Numpad *` | Toggle backlight ON/OFF |
+| `Numpad +` | Increase brightness |
+| `Numpad -` | Decrease brightness |
+| `Numpad /` | Cycle color |
 
 To install hotkeys:
 ```bash
